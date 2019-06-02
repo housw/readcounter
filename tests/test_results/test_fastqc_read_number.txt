@@ -1,0 +1,1 @@
+sample2_fastqc : 12733986

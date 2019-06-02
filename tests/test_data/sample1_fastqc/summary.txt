@@ -1,0 +1,12 @@
+PASS	Basic Statistics	PTR23Amt_S24_L002_R1_001.fastq.gz
+PASS	Per base sequence quality	PTR23Amt_S24_L002_R1_001.fastq.gz
+PASS	Per tile sequence quality	PTR23Amt_S24_L002_R1_001.fastq.gz
+PASS	Per sequence quality scores	PTR23Amt_S24_L002_R1_001.fastq.gz
+FAIL	Per base sequence content	PTR23Amt_S24_L002_R1_001.fastq.gz
+FAIL	Per sequence GC content	PTR23Amt_S24_L002_R1_001.fastq.gz
+PASS	Per base N content	PTR23Amt_S24_L002_R1_001.fastq.gz
+WARN	Sequence Length Distribution	PTR23Amt_S24_L002_R1_001.fastq.gz
+FAIL	Sequence Duplication Levels	PTR23Amt_S24_L002_R1_001.fastq.gz
+WARN	Overrepresented sequences	PTR23Amt_S24_L002_R1_001.fastq.gz
+PASS	Adapter Content	PTR23Amt_S24_L002_R1_001.fastq.gz
+FAIL	Kmer Content	PTR23Amt_S24_L002_R1_001.fastq.gz

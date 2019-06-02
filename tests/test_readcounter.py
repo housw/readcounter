@@ -107,11 +107,11 @@ def test_input_fq_zip(runner):
     assert read_count == 'test : 250\n'
 
 
-def test_input_fastqc(runner):
+def test_input_fastqc_zip(runner):
     input_file = pkg_resources.resource_filename(__name__, 'test_data/sample1_fastqc.zip')    
     format = 'fastqc'
     output_dir = "./tests/test_results"
-    output_prefix = "test_{s}".format(s=format)
+    output_prefix = "test_{s}_zip".format(s=format)
     result = runner.invoke(cli.main, ['--format', format, 
                                       '--output_dir', output_dir, 
                                       '--prefix', output_prefix,
@@ -123,4 +123,21 @@ def test_input_fastqc(runner):
     output_file = os.path.join(output_dir, output_prefix + "_read_number.txt")
     read_count = open(output_file, 'r').read()
     assert read_count == 'sample1_fastqc : 12733986\n'
-    
+
+
+def test_input_fastqc_folder(runner):
+    input_file = pkg_resources.resource_filename(__name__, 'test_data/sample2_fastqc')
+    format = 'fastqc'
+    output_dir = "./tests/test_results"
+    output_prefix = "test_{s}".format(s=format)
+    result = runner.invoke(cli.main, ['--format', format,
+                                      '--output_dir', output_dir,
+                                      '--prefix', output_prefix,
+                                      '--compress_type', 'none',
+                                      '--force', input_file])
+    if result.exception:
+        traceback.print_exception(*result.exc_info)
+    assert result.exit_code == 0
+    output_file = os.path.join(output_dir, output_prefix + "_read_number.txt")
+    read_count = open(output_file, 'r').read()
+    assert read_count == 'sample2_fastqc : 12733986\n'
