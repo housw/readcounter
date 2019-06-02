@@ -17,7 +17,7 @@ def validate_rolls(ctx, param, value):
 
 @click.command()
 @click.argument('input_file', type=str)
-@click.option('-t', '--format', type=click.Choice(["infer", "fasta", "fastq", "fastqc"]),
+@click.option('-t', '--format', type=click.Choice(["infer", "fasta", "fa", "fna", "fastq", "fq", "fastqc"]),
                     default="infer", help="input file format, \
                          can be infer/fasta/fastq/fastqc", show_default=True)
 @click.option('-c', '--compress_type', type=click.Choice(["infer", "none", "gz", "zip", "bz2"]),
@@ -27,7 +27,7 @@ def validate_rolls(ctx, param, value):
 @click.option('-p', '--prefix', help="output prefix", type=str)
 @click.option('-o', '--output_dir', help="output directory", default="./", show_default=True)
 @click.option('-f', '--force', is_flag=True, help="force to overwrite the output file")
-@click.version_option(version="0.1.0", prog_name="%(prog)", message="%(prog)s, version %(version)s")
+@click.version_option(version="0.1.0", prog_name="readcounter", message="%(prog)s, version %(version)s")
 def main(input_file, format, compress_type, prefix, output_dir, force):
     """count total read number in given input file."""
 
@@ -63,11 +63,12 @@ def main(input_file, format, compress_type, prefix, output_dir, force):
             raise click.UsageError(message=err_msg)
 
     # input and output handeling
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     if not prefix:
         basename = os.path.basename(input_file)
         prefix = os.path.splitext(basename)[0]
-        out_file = os.path.join(output_dir, prefix + "_read_number.txt")
-
+    out_file = os.path.join(output_dir, prefix + "_read_number.txt")
     if os.path.exists(out_file):
         if force:
             click.echo("Warning: output file exists, will be overwriten!")
@@ -84,6 +85,6 @@ def main(input_file, format, compress_type, prefix, output_dir, force):
 
 
 if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover
+    sys.exit(main())
 
 

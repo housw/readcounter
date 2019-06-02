@@ -45,7 +45,7 @@ class FastaReadCounter(ReadCounter):
 
     def count_read_number(self):
         grep_prog = ReadCounter._grep_map.get(self.compress_type)
-        cmd = "{grep_prog} -cP '^>' {input_file}".format(grep_prog=grep_prog, input_file=self.input_file)
+        cmd = "{grep_prog} -c '^>' {input_file}".format(grep_prog=grep_prog, input_file=self.input_file)
         return subprocess.check_output(cmd, shell=True)
 
 
@@ -53,7 +53,7 @@ class FastqReadCounter(ReadCounter):
 
     def count_read_number(self):
         grep_prog = ReadCounter._grep_map.get(self.compress_type)
-        cmd = "{grep_prog} -cP '^@' {input_file}".format(grep_prog=grep_prog, input_file=self.input_file)
+        cmd = "{grep_prog} -c '^@' {input_file}".format(grep_prog=grep_prog, input_file=self.input_file)
         return subprocess.check_output(cmd, shell=True)
 
 
@@ -76,7 +76,10 @@ class FastqcReadCounter(ReadCounter):
 class CounterDispatcher(ReadCounter):
 
     counter_map = {"fasta":FastaReadCounter,
+                   "fa":FastaReadCounter,
+                   "fna":FastaReadCounter,
                    "fastq":FastqReadCounter,
+                   "fq":FastqReadCounter,
                    "fastqc":FastqcReadCounter
                    }
 
