@@ -6,13 +6,13 @@ verify_ssl = true
 [dev-packages]
 bumpversion = "==0.5.3"
 watchdog = "==0.9.0"
-flake8 = "==3.5.0"
-tox = "==3.5.2"
-coverage = "==4.5.1"
-twine = "==1.12.1"
-pytest = ">=3.8.*"
-pytest-runner = "==4.2"
-Sphinx = "==1.8.1"
+flake8 = "==3.7.7"
+tox = "==3.12.1"
+coverage = "==4.5.3"
+twine = "==1.13.0"
+pytest = "==4.6.0"
+pytest-runner = "==5.1"
+Sphinx = "==2.0.1"
 
 [packages]
 bumpversion = "==0.5.3"
