@@ -20,22 +20,23 @@ readcounter
 
 
 
-read counting for different file types
+A read counting program support different input file and compression types.
 
 
 * Free software: MIT license
 * Documentation: https://readcounter.readthedocs.io.
 
 
-Features
---------
 
-* TODO
+Supported File Types
+--------------------
+* `fasta` format, can be 'fa', 'fna', 'fasta'
+* `fastq` format, can be 'fq', 'fastq'
+* `fastqc` format, input must be the fastqc folder, zipped or not
 
-Credits
--------
 
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
-
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+Supported Compression Types
+---------------------------
+* `gzip` type, with 'gz' suffix
+* `bzip2` type, with 'bz2' suffix
+* `zip` type, with 'zip' suffix

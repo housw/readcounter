@@ -9,6 +9,7 @@ import sys
 import argparse
 import subprocess
 import logging
+import shutil
 
 
 class ReadCounter(object):
@@ -71,6 +72,7 @@ class FastqcReadCounter(ReadCounter):
     def count_read_number(self):
         """This function implement read counting for input files in fastqc format."""
 
+        cleanup_folder = []
         if self.compress_type == "zip":
             fastqc_zip = self.input_file
             abs_path = os.path.abspath(fastqc_zip)
@@ -79,11 +81,17 @@ class FastqcReadCounter(ReadCounter):
             fastqc_folder = dir_name + "/" + base_name
             cmd = "unzip -o {fastqc_zip} -d {dir_name} && cat {fastqc_folder}/fastqc_data.txt | " \
                   "grep '^Total Sequences'".format(fastqc_zip=fastqc_zip, dir_name=dir_name, fastqc_folder=fastqc_folder)
+            cleanup_folder.append(fastqc_folder)
         else:
             fastqc_folder = self.input_file
             cmd = "cat {fastqc_folder}/fastqc_data.txt | grep '^Total Sequences'".format(fastqc_folder=fastqc_folder)
         line = subprocess.check_output(cmd, shell=True)
         count = line.strip().split()[-1]
+        for folder in cleanup_folder:
+            try:
+                shutil.rmtree(folder, ignore_errors=False)
+            except Exception as e:
+                print(e)
         return count
 
 

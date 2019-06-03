@@ -1,5 +1,5 @@
 Welcome to readcounter's documentation!
-======================================
+=======================================
 
 .. toctree::
    :maxdepth: 4

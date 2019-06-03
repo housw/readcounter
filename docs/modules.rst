@@ -1,19 +1,7 @@
-module package
-==============
+readcounter
+===========
 
-Module contents
----------------
+.. toctree::
+   :maxdepth: 4
 
-.. automodule:: readcounter
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-.. autoclass:: readcounter.readcounter.ReadCounter
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-.. autoclass:: readcounter.readcounter.CounterDispatcher
-    :members:
-
+   readcounter

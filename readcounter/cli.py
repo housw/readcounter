@@ -6,6 +6,7 @@
 import os
 import sys
 import click
+import logging
 from readcounter.readcounter import CounterDispatcher
 
 
