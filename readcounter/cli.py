@@ -29,7 +29,7 @@ def validate_rolls(ctx, param, value):
                              it will guess gz/zip/bz2 from the suffix", show_default=True)
 @click.option('-p', '--prefix', help="output prefix", type=str)
 @click.option('-o', '--output_dir', help="output directory", default="./", show_default=True)
-@click.option('-f', '--force', is_flag=True, help="force to overwrite the output file")
+@click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file")
 @click.version_option(version="0.1.0", prog_name="readcounter", message="%(prog)s, version %(version)s")
 def main(input_file, format, compress_type, prefix, output_dir, force):
     """count total read number in given input file."""
