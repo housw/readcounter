@@ -20,7 +20,7 @@ def validate_rolls(ctx, param, value):
 
 @click.command()
 @click.argument('input_file', type=str)
-@click.option('-t', '--format', type=click.Choice(["infer", "fasta", "fa", "fna", "fastq", "fq", "fastqc"]),
+@click.option('-t', '--format', type=click.Choice(["infer", "bam", "fasta", "fa", "fna", "fastq", "fq", "fastqc"]),
                     default="infer", help="input file format, \
                          can be infer/fasta/fastq/fastqc", show_default=True)
 @click.option('-c', '--compress_type', type=click.Choice(["infer", "none", "gz", "zip", "bz2"]),
@@ -49,7 +49,8 @@ def main(input_file, format, compress_type, prefix, output_dir, force):
     # input file format handeling
     format_map = { "fa": "fasta", "fas": "fasta", "fasta": "fasta", "fna": "fasta", "faa": "fasta",
                    "fq": "fastq", "fastq": "fastq",
-                   "fastqc": "fastqc"}
+                   "fastqc": "fastqc",
+                   "bam": "bam"}
     if format == "infer":
         if "fastqc" in input_file:
             suffix = "fastqc"
