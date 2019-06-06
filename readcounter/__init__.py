@@ -14,3 +14,13 @@ def version():
     version_file.close()
     return _version
 __version__ = version()
+
+
+from .readcounter import (
+    ReadCounter,
+    FastaReadCounter,
+    FastqReadCounter,
+    FastqcReadCounter,
+    BamReadCounter,
+    CounterDispatcher,
+)

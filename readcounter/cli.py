@@ -7,7 +7,7 @@ import os
 import sys
 import click
 import logging
-from readcounter.readcounter import CounterDispatcher
+from .readcounter import CounterDispatcher
 
 
 def validate_rolls(ctx, param, value):
@@ -80,10 +80,10 @@ def main(input_file, format, compress_type, prefix, output_dir, force):
             err_msg = "output file detected, please backup it at first!"
             raise click.UsageError(message=err_msg)
 
-    with open(out_file, "w") as oh:
-        counter = CounterDispatcher(input_file, format, compress_type)
-        counter.count_read_number()
-        oh.write(str(counter) + '\n')
+    # read counting
+    counter = CounterDispatcher(input_file, out_file, format, compress_type)
+    counter.count_read_number()
+    counter.write()
 
     return 0
 

@@ -13,6 +13,7 @@ twine = "==1.13.0"
 pytest = "==4.6.0"
 pytest-runner = "==5.1"
 Sphinx = "==2.0.1"
+pysam = "==0.15.2"
 
 [packages]
 bumpversion = "==0.5.3"
@@ -25,6 +26,7 @@ pytest = "==3.8.2"
 pytest-runner = "==4.2"
 Sphinx = "==1.8.1"
 biopython = ">=1.68"
+pysam = "*"
 
 [requires]
 python_version = "3.7"

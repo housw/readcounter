@@ -5,6 +5,7 @@
 import os
 import pytest
 import traceback
+import subprocess
 from click.testing import CliRunner
 from readcounter import readcounter
 from readcounter import cli
@@ -141,3 +142,23 @@ def test_input_fastqc_folder(runner):
     output_file = os.path.join(output_dir, output_prefix + "_read_number.txt")
     read_count = open(output_file, 'r').read()
     assert read_count == 'sample2_fastqc : 12733986\n'
+
+
+def test_input_bam_file(runner):
+    input_file = pkg_resources.resource_filename(__name__, 'test_data/test.bam')
+    input_count_file = pkg_resources.resource_filename(__name__, 'test_data/bam_read_number.txt')
+    format = 'bam'
+    output_dir = "./tests/test_results"
+    output_prefix = "test_{s}".format(s=format)
+    result = runner.invoke(cli.main, ['--format', format,
+                                      '--output_dir', output_dir,
+                                      '--prefix', output_prefix,
+                                      '--compress_type', 'none',
+                                      '--force', input_file])
+    if result.exception:
+        traceback.print_exception(*result.exc_info)
+    assert result.exit_code == 0
+    output_file = os.path.join(output_dir, output_prefix + "_read_number.txt")
+    read_count = open(output_file, 'r').read()
+    ret_code = subprocess.check_call("diff {in_count} {out_count}".format(in_count=input_count_file, out_count=output_file), shell=True)
+    assert ret_code == 0

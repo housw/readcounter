@@ -7,18 +7,22 @@ from __future__ import print_function
 import os
 import sys
 import argparse
-import subprocess
 import logging
 import shutil
 import tempfile
 import pysam
+import pandas as pd
+import subprocess
+from subprocess import Popen, PIPE
+from abc import ABC, abstractmethod
 
 
-class ReadCounter(object):
+class ReadCounter(ABC):
     """Abstract ReadCounter class.
 
     Note:
-        Do not initialize this abstract class, inherit and implement the `count_read_number` method.
+        Do not initialize this abstract class,
+        instead, please inherit this abstract class and implement the `count_read_number` and `write` abstract methods.
 
     Attributes:
         input_file (str): input file to count read number.
@@ -32,7 +36,7 @@ class ReadCounter(object):
                 "bz2":"bzgrep"
                 }
 
-    def __init__(self, input_file, format, compress_type):
+    def __init__(self, input_file, out_file, format, compress_type):
         """ To initialize a ReadCounter object
 
         Args:
@@ -42,16 +46,24 @@ class ReadCounter(object):
         """
 
         self.input_file = input_file
+        self.out_file = out_file
         self.format = format
         self.compress_type = compress_type
+        self.read_count = 0
 
+    @property
+    def output_filestem(self):
+        _base_name = os.path.basename(self.input_file)
+        _file_stem = os.path.splitext(_base_name)[0]
+        return _file_stem
+
+    @abstractmethod
     def count_read_number(self):
         pass
 
-    def __str__(self):
-        _basename = os.path.basename(self.input_file)
-        _filestem = os.path.splitext(_basename)[0]
-        return "{filestem} : {read_count:d}".format(filestem=_filestem, read_count=int(self.read_count))
+    @abstractmethod
+    def write(self):
+        pass
 
 
 class FastaReadCounter(ReadCounter):
@@ -61,7 +73,13 @@ class FastaReadCounter(ReadCounter):
 
         grep_prog = ReadCounter._grep_map.get(self.compress_type)
         cmd = "{grep_prog} -c '^>' {input_file}".format(grep_prog=grep_prog, input_file=self.input_file)
-        return subprocess.check_output(cmd, shell=True)
+        p = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+        read_count, err = p.communicate()
+        self.read_count = read_count.strip()
+
+    def write(self):
+        with open(self.out_file, 'w') as oh:
+            oh.write("{filestem} : {read_count:d}".format(filestem=self.output_filestem, read_count=int(self.read_count)) + "\n")
 
 
 class FastqReadCounter(ReadCounter):
@@ -71,7 +89,13 @@ class FastqReadCounter(ReadCounter):
 
         grep_prog = ReadCounter._grep_map.get(self.compress_type)
         cmd = "{grep_prog} -c '^@' {input_file}".format(grep_prog=grep_prog, input_file=self.input_file)
-        return subprocess.check_output(cmd, shell=True)
+        p = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+        read_count, err = p.communicate()
+        self.read_count = read_count.strip()
+
+    def write(self):
+        with open(self.out_file, 'w') as oh:
+            oh.write("{filestem} : {read_count:d}".format(filestem=self.output_filestem, read_count=int(self.read_count)) + "\n")
 
 
 class FastqcReadCounter(ReadCounter):
@@ -93,24 +117,27 @@ class FastqcReadCounter(ReadCounter):
             fastqc_folder = self.input_file
             cmd = "cat {fastqc_folder}/fastqc_data.txt | grep '^Total Sequences'".format(fastqc_folder=fastqc_folder)
         line = subprocess.check_output(cmd, shell=True)
-        count = line.strip().split()[-1]
+        read_count = line.strip().split()[-1]
         for folder in cleanup_folder:
             try:
                 shutil.rmtree(folder, ignore_errors=False)
             except Exception as e:
                 print(e)
-        return count
+        self.read_count = read_count
+
+    def write(self):
+        with open(self.out_file, 'w') as oh:
+            oh.write("{filestem} : {read_count:d}".format(filestem=self.output_filestem, read_count=int(self.read_count)) + "\n")
 
 
 class BamReadCounter(ReadCounter):
 
-    def __init__(self, input_file, format="bam", compress_type="none"):
+    def __init__(self, input_file, out_file, format="bam", compress_type="none"):
         try:
-            super().__init__(input_file, format, compress_type)
+            super().__init__(input_file, out_file, format, compress_type)
         except Exception as e:
             print("WARNING: Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
-            super(BamReadCounter, self).__init__(input_file, format, compress_type)
-        self.read_count = 0
+            super(BamReadCounter, self).__init__(input_file, out_file, format, compress_type)
 
     def _get_depth_per_bam_file(self, min_read_len=30, min_MQ=0, min_BQ=0, pysam_mem='10G'):
 
@@ -119,7 +146,6 @@ class BamReadCounter(ReadCounter):
         input_filestem = os.path.splitext(input_basename)[0]
         tmp_bamcov_dir = tempfile.mkdtemp()
         tmp_bamcov_file = os.path.join(tmp_bamcov_dir, input_filestem+"_bamcov.tsv")
-        print(tmp_bamcov_dir, tmp_bamcov_file)
 
         if not os.path.exists(self.input_file + ".bai"):
             pysam.index(self.input_file)
@@ -132,7 +158,8 @@ class BamReadCounter(ReadCounter):
                self.input_file]
         print("[bamcov] {c}".format(c=" ".join(cmd)))
         try:
-            ret_code = subprocess.check_call(cmd, shell=False)
+            p = subprocess.Popen(cmd, shell=False, stdout=PIPE, stderr=PIPE)
+            output, err = p.communicate()
         except Exception as e:
             print("It seems like your bam file is not sorted, trying to sort it and run bamcov again ...")
             try:
@@ -145,92 +172,22 @@ class BamReadCounter(ReadCounter):
             except Exception as e:
                 raise Exception("failed to call bamcov, try to debug in terminal with this command {cmd}".format(cmd=" ".join(cmd)))
 
-        return tmp_bamcov_file
-
+        # return bamcov df
+        df = pd.read_csv(tmp_bamcov_file, sep='\t')
+        shutil.rmtree(tmp_bamcov_dir, ignore_errors=True)
+        return df
 
     def count_read_number(self):
         """This function implement read counting for input files in bam format."""
 
-        bamcov_file = self._get_depth_per_bam_file()
-        '''
-        cleanup_folder = []
-        if self.compress_type == "zip":
-            fastqc_zip = self.input_file
-            abs_path = os.path.abspath(fastqc_zip)
-            base_name = os.path.basename(abs_path).rstrip('.zip')
-            dir_name = os.path.dirname(abs_path)
-            fastqc_folder = dir_name + "/" + base_name
-            cmd = "unzip -o {fastqc_zip} -d {dir_name} && cat {fastqc_folder}/fastqc_data.txt | " \
-                  "grep '^Total Sequences'".format(fastqc_zip=fastqc_zip, dir_name=dir_name, fastqc_folder=fastqc_folder)
-            cleanup_folder.append(fastqc_folder)
-        else:
-            fastqc_folder = self.input_file
-            cmd = "cat {fastqc_folder}/fastqc_data.txt | grep '^Total Sequences'".format(fastqc_folder=fastqc_folder)
-        line = subprocess.check_output(cmd, shell=True)
-        count = line.strip().split()[-1]
-        for folder in cleanup_folder:
-            try:
-                shutil.rmtree(folder, ignore_errors=False)
-            except Exception as e:
-                print(e)
-        return count
-        '''
+        df = self._get_depth_per_bam_file()
+        selected_df = df[['#rname', 'endpos', 'numreads']] #, 'covbases', 'coverage', 'meandepth']]
+        selected_df.columns = ['contig', 'length', 'numreads']
+        selected_df = selected_df[selected_df['numreads'] != 0]
+        self.read_count = selected_df
 
-
-
-
-
-    """
-    def calculate_contig_depth_from_bam_files(input_bam_file_list, output_dir, output_prefix):
-    
-        depth_files = []
-        sample_names = []
-    
-        # run bamcov for each bam file
-        for bam_file in input_bam_file_list:
-            basename = os.path.basename(bam_file)
-            filestem = os.path.splitext(basename)[0]
-            depth_file = os.path.join(output_dir, filestem+"_bamcov.tsv")
-            get_depth_per_bam_file(bam_file, depth_file)
-            sample_names.append(filestem)
-            depth_files.append(depth_file)
-    
-        # write contig length file
-        output_length_file = os.path.join(output_dir, output_prefix+"_length.tsv")
-        first_df = pd.read_csv(depth_files[0], sep='\t', header=0, index_col=0)
-        length_df = first_df[['endpos']]
-        length_df.rename(columns={'endpos':'Length'}, inplace=True)
-        length_df.index.name = "Contig_ID"
-        length_df.to_csv(output_length_file, sep='\t', header=True, index=True)
-    
-        # merge depth profiles and write depth file
-        output_depth_file = os.path.join(output_dir, output_prefix+"_depth.tsv")
-        all_depth_dfs = []
-        shape = None
-        for i, depth_file in enumerate(depth_files):
-            curr_depth_df = pd.read_csv(depth_file, sep='\t', header=0, index_col=0).meandepth.rename(sample_names[i])
-            if not shape:
-                shape = curr_depth_df.shape
-            else:
-                assert curr_depth_df.shape == shape, "input depth files has different dimensions!"
-            all_depth_dfs.append(curr_depth_df)
-        depth_df = pd.concat(all_depth_dfs, axis=1)
-        depth_df.index.name="Contig_ID"
-        depth_df.to_csv(output_depth_file, sep="\t", header=True, index=True)
-    """
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def write(self):
+        self.read_count.to_csv(path_or_buf=self.out_file, sep='\t', header=True, index=False)
 
 
 class CounterDispatcher(ReadCounter):
@@ -245,19 +202,21 @@ class CounterDispatcher(ReadCounter):
                    "bam": BamReadCounter
                    }
 
-    def __init__(self, input_file, format, compress_type):
+    def __init__(self, input_file, out_file, format, compress_type):
         try:
-            super().__init__(input_file, format, compress_type)
+            super().__init__(input_file, out_file, format, compress_type)
         except Exception as e:
             print("WARNING: Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
-            super(CounterDispatcher, self).__init__(input_file, format, compress_type)
+            super(CounterDispatcher, self).__init__(input_file, out_file, format, compress_type)
         self.counter = self._get_read_counter()
-        self.read_count = 0
 
     def _get_read_counter(self):
-        return CounterDispatcher.counter_map.get(self.format, None)
+        _Counter = CounterDispatcher.counter_map.get(self.format, None)
+        _counter = _Counter(self.input_file, self.out_file, self.format, self.compress_type)
+        return _counter
 
     def count_read_number(self):
-        counter = self.counter(self.input_file, self.format, self.compress_type)
-        self.read_count = counter.count_read_number()
+        self.counter.count_read_number()
 
+    def write(self):
+        self.counter.write()
