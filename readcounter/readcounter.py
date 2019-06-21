@@ -17,6 +17,9 @@ from subprocess import Popen, PIPE
 from abc import ABC, abstractmethod
 
 
+_logger = logging.getLogger(__name__)
+
+
 class ReadCounter(ABC):
     """Abstract ReadCounter class.
 
@@ -36,7 +39,7 @@ class ReadCounter(ABC):
                 "bz2":"bzgrep"
                 }
 
-    def __init__(self, input_file, out_file, format, compress_type):
+    def __init__(self, input_file, out_file, compress_type):
         """ To initialize a ReadCounter object
 
         Args:
@@ -47,14 +50,20 @@ class ReadCounter(ABC):
 
         self.input_file = input_file
         self.out_file = out_file
-        self.format = format
         self.compress_type = compress_type
         self.read_count = 0
 
     @property
     def output_filestem(self):
-        _base_name = os.path.basename(self.input_file)
-        _file_stem = os.path.splitext(_base_name)[0]
+        # use normpath to catch basename for fastqc folder
+        _base_name = os.path.basename(os.path.normpath(self.input_file))
+        if "." in _base_name:
+            _file_stem, ext = os.path.splitext(_base_name)
+        else:
+            _file_stem, ext = _base_name, "None"
+        # e.g., remove .fq.gz
+        if ext in (".gz", ".gzip", ".bz2", ".bzip2", ".zip"):
+            _file_stem = os.path.splitext(_file_stem)[0]
         return _file_stem
 
     @abstractmethod
@@ -122,7 +131,7 @@ class FastqcReadCounter(ReadCounter):
             try:
                 shutil.rmtree(folder, ignore_errors=False)
             except Exception as e:
-                print(e)
+                _logger.warning(e)
         self.read_count = read_count
 
     def write(self):
@@ -132,12 +141,12 @@ class FastqcReadCounter(ReadCounter):
 
 class BamReadCounter(ReadCounter):
 
-    def __init__(self, input_file, out_file, format="bam", compress_type="none"):
+    def __init__(self, input_file, out_file, compress_type="none"):
         try:
-            super().__init__(input_file, out_file, format, compress_type)
+            super().__init__(input_file, out_file, compress_type)
         except Exception as e:
-            print("WARNING: Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
-            super(BamReadCounter, self).__init__(input_file, out_file, format, compress_type)
+            _logger.warning("Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
+            super(BamReadCounter, self).__init__(input_file, out_file, compress_type)
 
     def _get_depth_per_bam_file(self, min_read_len=30, min_MQ=0, min_BQ=0, pysam_mem='10G'):
 
@@ -156,15 +165,15 @@ class BamReadCounter(ReadCounter):
                '--min-MQ', str(min_MQ),
                '--min-BQ', str(min_BQ),
                self.input_file]
-        print("[bamcov] {c}".format(c=" ".join(cmd)))
+        _logger.info("[bamcov commandline] {c}".format(c=" ".join(cmd)))
         try:
             p = subprocess.Popen(cmd, shell=False, stdout=PIPE, stderr=PIPE)
             output, err = p.communicate()
         except Exception as e:
-            print("It seems like your bam file is not sorted, trying to sort it and run bamcov again ...")
+            _logger.warning("It seems like your bam file is not sorted, trying to sort it and run bamcov again ...")
             try:
                 tmp_file = tempfile.mkstemp()[1]
-                print(tmp_file)
+                _logger.debug(tmp_file)
                 pysam.sort("-o", tmp_file, self.input_file)
                 shutil.move(tmp_file, self.input_file)
                 pysam.index(self.input_file)
@@ -194,25 +203,24 @@ class CounterDispatcher(ReadCounter):
     """dispatch read counting jobs"""
 
     counter_map = {"fasta": FastaReadCounter,
-                   "fa": FastaReadCounter,
-                   "fna": FastaReadCounter,
                    "fastq": FastqReadCounter,
-                   "fq": FastqReadCounter,
                    "fastqc": FastqcReadCounter,
-                   "bam": BamReadCounter
+                   "bam": BamReadCounter, 
+                   "sam": BamReadCounter
                    }
 
     def __init__(self, input_file, out_file, format, compress_type):
         try:
-            super().__init__(input_file, out_file, format, compress_type)
+            super().__init__(input_file, out_file, compress_type)
         except Exception as e:
-            print("WARNING: Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
-            super(CounterDispatcher, self).__init__(input_file, out_file, format, compress_type)
+            _logger.warning("Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
+            super(CounterDispatcher, self).__init__(input_file, out_file, compress_type)
+        self.format = format
         self.counter = self._get_read_counter()
 
     def _get_read_counter(self):
         _Counter = CounterDispatcher.counter_map.get(self.format, None)
-        _counter = _Counter(self.input_file, self.out_file, self.format, self.compress_type)
+        _counter = _Counter(self.input_file, self.out_file, self.compress_type)
         return _counter
 
     def count_read_number(self):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Top-level package for readcounter."""
+"""readcounter: a general read counting program"""
 
 
 __author__ = """Shengwei Hou"""

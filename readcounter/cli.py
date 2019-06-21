@@ -8,84 +8,98 @@ import sys
 import click
 import logging
 from .readcounter import CounterDispatcher
+from .utils import make_output_file
+from .utils import add_options
+from .utils import guess_compress_type
+from .utils import setup_logging
 
 
-def validate_rolls(ctx, param, value):
-    try:
-        rolls, dice = map(int, value.split('d', 2))
-        return (dice, rolls)
-    except ValueError:
-        raise click.BadParameter('rolls need to be in format NdM')
+_logger = logging.getLogger(__name__)
+
+
+shared_options = [
+    click.argument('input_file', type=str),
+    click.option('-p', '--prefix', help="output prefix", type=str), 
+    click.option('-o', '--output_dir', help="output directory", default="./", show_default=True), 
+    click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file"), 
+    click.option('-l', '--loglevel', default='info', type=click.Choice(['critical', 'error', 'warning', 'info', 'debug'])),
+    click.version_option(version="0.1.0", prog_name="readcounter", message="%(prog)s, version %(version)s")
+]
+
+
+def emit_subcommand_info(subcommand, loglevel):
+    setup_logging(loglevel)
+    _logger.info('invoking {0} subcommand'.format(subcommand))
 
 
 @click.command()
-@click.argument('input_file', type=str)
-@click.option('-t', '--format', type=click.Choice(["infer", "bam", "fasta", "fa", "fna", "fastq", "fq", "fastqc"]),
-                    default="infer", help="input file format, \
-                         can be infer/fasta/fastq/fastqc", show_default=True)
-@click.option('-c', '--compress_type', type=click.Choice(["infer", "none", "gz", "zip", "bz2"]),
-                    default="infer", help="input file compress type, \
-                             can be infer/none/gz/zip/bz2, \
-                             it will guess gz/zip/bz2 from the suffix", show_default=True)
-@click.option('-p', '--prefix', help="output prefix", type=str)
-@click.option('-o', '--output_dir', help="output directory", default="./", show_default=True)
-@click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file")
-@click.version_option(version="0.1.0", prog_name="readcounter", message="%(prog)s, version %(version)s")
-def main(input_file, format, compress_type, prefix, output_dir, force):
-    """count total read number in given input file."""
-
-    suffix = input_file.split(".")[-1]
-
-    # compress_type handeling
-    compress_map = { "gz": "gz", "gzip":"gz",
-                     "bz2": "bz2", "bzip2": "bz2",
-                     "zip": "zip"}
-    if compress_type == "infer":
-        if suffix in compress_map:
-            compress_type = compress_map.get(suffix)
-        else:
-            compress_type = "none"
-
-    # input file format handeling
-    format_map = { "fa": "fasta", "fas": "fasta", "fasta": "fasta", "fna": "fasta", "faa": "fasta",
-                   "fq": "fastq", "fastq": "fastq",
-                   "fastqc": "fastqc",
-                   "bam": "bam"}
-    if format == "infer":
-        if "fastqc" in input_file:
-            suffix = "fastqc"
-        elif suffix in compress_map:
-            if len(input_file.split(".")) > 2:
-                suffix = input_file.split(".")[-2]
-            else:
-                err_msg="\nERROR: {suffix} file format is not supported!\n".format(suffix=suffix)
-                raise click.UsageError(message=err_msg)
-        if suffix in format_map:
-            format = format_map.get(suffix)
-        else:
-            err_msg = "\nERROR: {suffix} file format is not supported!\n".format(suffix=suffix)
-            raise click.UsageError(message=err_msg)
-
-    # input and output handeling
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    if not prefix:
-        basename = os.path.basename(input_file)
-        prefix = os.path.splitext(basename)[0]
-    out_file = os.path.join(output_dir, prefix + "_read_number.txt")
-    if os.path.exists(out_file):
-        if force:
-            click.echo("Warning: output file exists, will be overwriten!")
-        else:
-            err_msg = "output file detected, please backup it at first!"
-            raise click.UsageError(message=err_msg)
-
+@add_options(shared_options)
+def fasta(input_file, prefix, output_dir, force, loglevel):
+    emit_subcommand_info("fasta", loglevel)
+    output_file = make_output_file(input_file, prefix, output_dir, force, suffix=".txt")
+    compress_type = guess_compress_type(input_file)
+    _logger.info('the compress type is ' + compress_type)
     # read counting
-    counter = CounterDispatcher(input_file, out_file, format, compress_type)
+    counter = CounterDispatcher(input_file, output_file, format="fasta", compress_type=compress_type)
     counter.count_read_number()
     counter.write()
 
-    return 0
+
+@click.command()
+@add_options(shared_options)
+def fastq(input_file, prefix, output_dir, force, loglevel):
+    emit_subcommand_info("fastq", loglevel)
+    output_file = make_output_file(input_file, prefix, output_dir, force, suffix=".txt")
+    compress_type = guess_compress_type(input_file)
+    _logger.info('the compress type is ' + compress_type)
+    # read counting
+    counter = CounterDispatcher(input_file, output_file, format="fastq", compress_type=compress_type)
+    counter.count_read_number()
+    counter.write()
+
+
+@click.command()
+@add_options(shared_options)
+def fastqc(input_file, prefix, output_dir, force, loglevel):
+    emit_subcommand_info("fastqc", loglevel)
+    output_file = make_output_file(input_file, prefix, output_dir, force, suffix=".txt")
+    compress_type = guess_compress_type(input_file)
+    _logger.info('the compress type is ' + compress_type)
+    # read counting
+    counter = CounterDispatcher(input_file, output_file, format="fastqc", compress_type=compress_type)
+    counter.count_read_number()
+    counter.write()
+
+
+@click.command()
+@add_options(shared_options)
+def sam(input_file, prefix, output_dir, force, loglevel):
+    _logger.info('invoking sam subcommand')
+    # TODO:
+
+
+@click.command()
+@add_options(shared_options)
+def bam(input_file, prefix, output_dir, force, loglevel):
+    emit_subcommand_info("bam", loglevel)
+    output_file = make_output_file(input_file, prefix, output_dir, force, suffix=".txt")
+    compress_type = guess_compress_type(input_file)
+    _logger.info('the compress type is ' + compress_type)
+    # read counting
+    counter = CounterDispatcher(input_file, output_file, format="bam", compress_type=compress_type)
+    counter.count_read_number()
+    counter.write()
+
+
+@click.group()
+def main(**kwargs):
+    pass
+
+main.add_command(fasta)
+main.add_command(fastq)
+main.add_command(fastqc)
+main.add_command(sam)
+main.add_command(bam)
 
 
 if __name__ == "__main__":

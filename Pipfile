@@ -14,6 +14,7 @@ pytest = "==4.6.0"
 pytest-runner = "==5.1"
 Sphinx = "==2.0.1"
 pysam = "==0.15.0"
+pylint = "<2.0.0"
 
 [packages]
 bumpversion = "==0.5.3"
