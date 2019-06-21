@@ -39,7 +39,7 @@ class ReadCounter(ABC):
                 "bz2":"bzgrep"
                 }
 
-    def __init__(self, input_file, out_file, compress_type):
+    def __init__(self, input_file, out_file, compress_type, *args, **kwargs):
         """ To initialize a ReadCounter object
 
         Args:
@@ -141,14 +141,17 @@ class FastqcReadCounter(ReadCounter):
 
 class BamReadCounter(ReadCounter):
 
-    def __init__(self, input_file, out_file, compress_type="none"):
+    def __init__(self, input_file, out_file, compress_type="none", min_read_len=0, min_map_qual=0, min_base_qual=0, pysam_mem='10G'):
         try:
             super().__init__(input_file, out_file, compress_type)
         except Exception as e:
             _logger.warning("Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
             super(BamReadCounter, self).__init__(input_file, out_file, compress_type)
+        self.min_read_len = min_read_len
+        self.min_map_qual = min_map_qual
+        self.min_base_qual = min_base_qual
 
-    def _get_depth_per_bam_file(self, min_read_len=30, min_MQ=0, min_BQ=0, pysam_mem='10G'):
+    def _get_depth_per_bam_file(self):
 
         # create tmp dir and file to save bamcov result
         input_basename = os.path.basename(self.input_file)
@@ -157,14 +160,17 @@ class BamReadCounter(ReadCounter):
         tmp_bamcov_file = os.path.join(tmp_bamcov_dir, input_filestem+"_bamcov.tsv")
 
         if not os.path.exists(self.input_file + ".bai"):
+            _logger.info("indexing input sam file")
             pysam.index(self.input_file)
 
+        _logger.info("min_read_len is: "+ str(self.min_read_len))
         # command for bamcov
         cmd = ['bamcov', '--output', tmp_bamcov_file,
-               '--min-read-len', str(min_read_len),
-               '--min-MQ', str(min_MQ),
-               '--min-BQ', str(min_BQ),
+               '--min-read-len', str(self.min_read_len),
+               '--min-MQ', str(self.min_map_qual),
+               '--min-BQ', str(self.min_base_qual),
                self.input_file]
+        _logger.info("counting mapped reads using bamcov")
         _logger.info("[bamcov commandline] {c}".format(c=" ".join(cmd)))
         try:
             p = subprocess.Popen(cmd, shell=False, stdout=PIPE, stderr=PIPE)
@@ -209,19 +215,16 @@ class CounterDispatcher(ReadCounter):
                    "sam": BamReadCounter
                    }
 
-    def __init__(self, input_file, out_file, format, compress_type):
+    def __init__(self, input_file, out_file, format, compress_type, *args, **kwargs):
         try:
-            super().__init__(input_file, out_file, compress_type)
+            super().__init__(input_file, out_file, compress_type, *args, **kwargs)
         except Exception as e:
             _logger.warning("Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
-            super(CounterDispatcher, self).__init__(input_file, out_file, compress_type)
+            super(CounterDispatcher, self).__init__(input_file, out_file, compress_type, *args, **kwargs)
         self.format = format
-        self.counter = self._get_read_counter()
-
-    def _get_read_counter(self):
+        # get corresponding Counter class, and initialize a readcounter object
         _Counter = CounterDispatcher.counter_map.get(self.format, None)
-        _counter = _Counter(self.input_file, self.out_file, self.compress_type)
-        return _counter
+        self.counter = _Counter(self.input_file, self.out_file, self.compress_type, *args, **kwargs)
 
     def count_read_number(self):
         self.counter.count_read_number()
