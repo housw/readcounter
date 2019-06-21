@@ -11,6 +11,7 @@ import logging
 import shutil
 import tempfile
 import pysam
+import numpy as np
 import pandas as pd
 import subprocess
 from subprocess import Popen, PIPE
@@ -141,17 +142,19 @@ class FastqcReadCounter(ReadCounter):
 
 class BamReadCounter(ReadCounter):
 
-    def __init__(self, input_file, out_file, compress_type="none", min_read_len=0, min_map_qual=0, min_base_qual=0, pysam_mem='10G'):
+    def __init__(self, input_file, out_file, compress_type="none", min_read_len=0, min_aln_len=0, min_map_qual=0, min_base_qual=0, use_bamcov=False, pysam_mem='10G'):
         try:
             super().__init__(input_file, out_file, compress_type)
         except Exception as e:
             _logger.warning("Python3 is not supported by your interpreter: {err_msg}, using Python2 instead".format(err_msg=e))
             super(BamReadCounter, self).__init__(input_file, out_file, compress_type)
         self.min_read_len = min_read_len
+        self.min_aln_len = min_aln_len
         self.min_map_qual = min_map_qual
         self.min_base_qual = min_base_qual
+        self.use_bamcov = use_bamcov
 
-    def _get_depth_per_bam_file(self):
+    def _get_depth_per_bam_file_via_bamcov(self):
 
         # create tmp dir and file to save bamcov result
         input_basename = os.path.basename(self.input_file)
@@ -160,7 +163,7 @@ class BamReadCounter(ReadCounter):
         tmp_bamcov_file = os.path.join(tmp_bamcov_dir, input_filestem+"_bamcov.tsv")
 
         if not os.path.exists(self.input_file + ".bai"):
-            _logger.info("indexing input sam file")
+            _logger.info("indexing input bam file")
             pysam.index(self.input_file)
 
         _logger.info("min_read_len is: "+ str(self.min_read_len))
@@ -192,10 +195,56 @@ class BamReadCounter(ReadCounter):
         shutil.rmtree(tmp_bamcov_dir, ignore_errors=True)
         return df
 
+    def _get_depth_per_bam_file(self):
+        """ get read count for each contig"""
+
+        def filter_read(aln):
+            # possible filters
+            # aln.is_paired=True
+            # np.mean(aln.query_alignment_qualities[1])=30
+            if ((not aln.is_unmapped) and (not aln.is_duplicate) and (not aln.is_qcfail) and 
+                (not aln.is_secondary) and 
+                (not aln.is_supplementary) and 
+                (aln.query_length >= self.min_read_len) and 
+                (aln.mapping_quality >= self.min_map_qual) and 
+                (np.mean(aln.query_qualities[1]) >= self.min_base_qual) and 
+                (aln.query_alignment_length >= self.min_aln_len)):
+                return True
+            else:
+                return False
+
+        # create tmp dir and file to save bamcov result
+        input_basename = os.path.basename(self.input_file)
+        input_filestem = os.path.splitext(input_basename)[0]
+  
+        if not os.path.exists(self.input_file + ".bai"):
+            _logger.info("indexing input bam file")
+            pysam.index(self.input_file)
+
+        samfile = pysam.AlignmentFile(self.input_file, "rb") 
+        df = pd.DataFrame(samfile.header['SQ'])
+        df['start'] = [0]*len(df.index)
+        df['numreads'] = 0*len(df.index)
+        df.columns = ['endpos', '#rname', 'start', 'numreads']
+
+        _logger.info("counting mapped reads using pysam")
+        for i in df.index: 
+            stop, contig, start, numreads = df.loc[i,] 
+            count = samfile.count(contig=contig, start=start, stop=stop, region=None, until_eof=False, read_callback=filter_read)
+            df.loc[i, 'numreads'] = count 
+        
+        return df
+
     def count_read_number(self):
         """This function implement read counting for input files in bam format."""
-
-        df = self._get_depth_per_bam_file()
+        if self.use_bamcov:
+            try: 
+                df = self._get_depth_per_bam_file_via_bamcov()
+            except Exception as e:
+                _logger.error("it seems bamcov doesn't work for you, use pysam instead")
+                df = self._get_depth_per_bam_file()
+        else:
+            df = self._get_depth_per_bam_file()
         selected_df = df[['#rname', 'endpos', 'numreads']] #, 'covbases', 'coverage', 'meandepth']]
         selected_df.columns = ['contig', 'length', 'numreads']
         selected_df = selected_df[selected_df['numreads'] != 0]

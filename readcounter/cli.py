@@ -72,26 +72,22 @@ def fastqc(input_file, prefix, output_dir, force, loglevel):
 
 
 @click.command()
-@add_options(shared_options)
-def sam(input_file, prefix, output_dir, force, loglevel):
-    _logger.info('invoking sam subcommand')
-    # TODO:
-
-
-@click.command()
 @click.option('--min_read_len', help="minimum read length", type=int, default=0, show_default=True)
+@click.option('--min_aln_len', help="minimum alignment length", type=int, default=0, show_default=True)
 @click.option('--min_map_qual', help="minimum mapping quality", type=int, default=0, show_default=True)
 @click.option('--min_base_qual', help="minimum base quality", type=int, default=0, show_default=True)
+@click.option('--use_bamcov', is_flag=True, default=False, help="use bamcov for read counting", show_default=True)
 @click.option('--pysam_mem', help="maximum pysam memory", type=str, default='10G', show_default=True)
 @add_options(shared_options)
-def bam(input_file, prefix, output_dir, force, loglevel, min_read_len, min_map_qual, min_base_qual, pysam_mem):
+def bam(input_file, prefix, output_dir, force, loglevel, min_read_len, min_aln_len, min_map_qual, min_base_qual, use_bamcov, pysam_mem):
     emit_subcommand_info("bam", loglevel)
     output_file = make_output_file(input_file, prefix, output_dir, force, suffix=".txt")
     compress_type = guess_compress_type(input_file)
     _logger.info('the compress type is ' + compress_type)
     # read counting
     counter = CounterDispatcher(input_file, output_file, format="bam", compress_type=compress_type, 
-    min_read_len=min_read_len, min_map_qual=min_map_qual, min_base_qual=min_base_qual, pysam_mem=pysam_mem)
+    min_read_len=min_read_len, min_aln_len=min_aln_len, min_map_qual=min_map_qual, 
+    min_base_qual=min_base_qual, use_bamcov=use_bamcov, pysam_mem=pysam_mem)
     counter.count_read_number()
     counter.write()
 
@@ -103,11 +99,8 @@ def main(**kwargs):
 main.add_command(fasta)
 main.add_command(fastq)
 main.add_command(fastqc)
-main.add_command(sam)
 main.add_command(bam)
 
 
 if __name__ == "__main__":
     sys.exit(main())
-
-
